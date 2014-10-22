@@ -108,11 +108,11 @@ class LeafNode(Node):
 
 def compress(data, weights=None):
     """Performs huffman compression on data.
-       data - The data to compress (iterable).
+       data - The data to compress (bytes).
        weights - The weights for each code point. If None, we will use the
-           number of occurances. Should be formatted as {symbol: weight}.
+           number of occurances. Should be a dict of {symbol: weight}.
 
-       return - The compressed data as bytes
+       return - The compressed data, with the huffman tree prepended (bytes).
     """
     tree = Node.from_data(data, weights)
     codes = tree.codes()
@@ -137,6 +137,11 @@ def compress(data, weights=None):
 
 
 def decompress(data):
+    """Decompresses huffman compressed data.
+       data - The compressed data, with the huffman tree prepended (bytes).
+
+       return - The decompressed data (bytes)
+    """
     stream = bitstring.BitStream(data)
 
     # Read padding

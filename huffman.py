@@ -71,6 +71,7 @@ class Node(object):
 
         return heap[0]
 
+
 class LeafNode(Node):
     def __init__(self, symbol, weight=None, code=None):
         self.symbol = symbol
@@ -98,13 +99,15 @@ def compress(data, weights=None):
        weights - The weights for each code point. If None, we will use the
            number of occurances. Should be formatted as {symbol: weight}.
 
-       returns (compressed_data, huffman_tree)
+       return - The compressed data as bytes
     """
     tree = Node.from_data(data, weights)
     codes = tree.codes()
 
     output = tree.binary()
-    print(output)
+    for byte in data:
+        output.append(codes[byte])
+    return output.tobytes()
 
 
 def decompress(data):
@@ -118,7 +121,8 @@ class TestHuffmanCoding(unittest.TestCase):
         "2": "01",
         "3": "0"
     }
-    _simple_bits = bitstring.Bits("0b00100110001100110010100110011")
+    _simple_tree = bitstring.Bits("0b00100110001100110010100110011")
+    _simple_compressed = bitstring.Bits("0x2633299ea0")
 
     _lorem = (b"Lorem ipsum dolor sit amet, consectetur adipisicing "
         b"elit, sed do eiusmod tempor incididunt ut labore et dolore magna "
@@ -158,8 +162,17 @@ class TestHuffmanCoding(unittest.TestCase):
         "v": "0101001",
         "x": "1001001"
     }
-    _lorem_bits = bitstring.Bits("0x025c532ab62b85b2d25cadc2e2b359c5a144a2dd97"
+    _lorem_tree = bitstring.Bits("0x025c532ab62b85b2d25cadc2e2b359c5a144a2dd97"
         "8965d4586deba2c76d480b25cec, 0b101")
+    _lorem_compressed = bitstring.Bits("0x025c532ab62b85b2d25cadc2e2b359c5a144"
+        "a2dd978965d4586deba2c76d480b25cecbbeda028de8114c33b6c43a9c20a1324ca80"
+        "95050ecec37b439353301dd09880c4c34062813625009edb1ac9e1e056a0d47e3eda1"
+        "02a619db420b8caf4e77c8f7f17ea02b14ec4135628a415f084ce45a22b22b4710248"
+        "6c9d7536582efc29347e3edad115a1c1a9cef916f812607493084d86926540723d5fc"
+        "b48b44e1a08f4742619db6359a0fd0e905c06ba8d6296717d7504520eea0210124ddc"
+        "4530ceda100659132faa28bbf47f6bea1dfe1a64c81f403b10d6a34a5c12ea9217bc7"
+        "57545658fd67805a13102b51ac90bbfa722e359b2e4fa60101a2b504ceeea72b14788"
+        "08a8fc7db445f80")
 
     def test_tree_from_data(self):
         tree = Node.from_data(self._simple)
@@ -184,8 +197,11 @@ class TestHuffmanCoding(unittest.TestCase):
         self.assertEqual(codes, self._lorem_codes)
 
     def test_compression(self):
-        #compressed = compress(self._simple)
-        pass
+        compressed = compress(self._simple)
+        self.assertEqual(bitstring.Bits(compressed), self._simple_compressed)
+
+        compressed = compress(self._lorem)
+        self.assertEqual(bitstring.Bits(compressed), self._lorem_compressed)
 
 if __name__ == "__main__":
     unittest.main()

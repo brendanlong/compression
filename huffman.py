@@ -22,14 +22,20 @@ class Node(object):
             return self.symbol < other.symbol
         return self.weight < other.weight
 
-    def append_to_code(self, bit):
+    def add_to_code(self, bit):
         for child in self.left, self.right:
-            child.append_to_code(bit)
+            child.add_to_code(bit)
 
     def codes(self):
         out = self.left.codes()
         out.update(self.right.codes())
         return out
+
+    def read(self, stream):
+        if stream.read("bool"):
+            return self.left.read(stream)
+        else:
+            return self.right.read(stream)
 
     def binary(self, out=None):
         out = bitstring.BitArray("0b0")
@@ -38,10 +44,14 @@ class Node(object):
         return out
 
     @staticmethod
-    def from_binary(data):
-        stream = bitstring.BitStream(data)
+    def from_binary(stream):
+        try:
+            stream.pos
+        except AttributeError:
+            stream = bitstring.BitStream(stream)
         code = bitstring.BitArray()
-        return Node._from_binary(stream, code)
+        out = Node._from_binary(stream, code)
+        return out
 
     @staticmethod
     def _from_binary(stream, code):
@@ -50,8 +60,8 @@ class Node(object):
             return LeafNode(symbol, code=code)
         else:
             return Node(
-                Node._from_binary(stream, bitstring.Bits("0b1") + code),
-                Node._from_binary(stream, bitstring.Bits("0b0") + code))
+                Node._from_binary(stream, code + bitstring.Bits("0b1")),
+                Node._from_binary(stream, code + bitstring.Bits("0b0")))
 
     @staticmethod
     def from_data(data, weights=None):
@@ -65,8 +75,8 @@ class Node(object):
         while len(heap) > 1:
             first = heapq.heappop(heap)
             second = heapq.heappop(heap)
-            first.append_to_code(1)
-            second.append_to_code(0)
+            first.add_to_code(1)
+            second.add_to_code(0)
             heapq.heappush(heap, Node(first, second))
 
         return heap[0]
@@ -81,8 +91,8 @@ class LeafNode(Node):
         else:
             self.code = bitstring.BitArray()
 
-    def append_to_code(self, bit):
-        self.code.append("0b%s" % bit)
+    def add_to_code(self, bit):
+        self.code.prepend("0b%s" % bit)
 
     def codes(self):
         return {self.symbol: self.code}
@@ -91,6 +101,9 @@ class LeafNode(Node):
         out = bitstring.BitArray("0b1")
         out.append(bitstring.Bits(uint=self.symbol, length=8))
         return out
+
+    def read(self, stream):
+        return self.symbol
 
 
 def compress(data, weights=None):
@@ -107,22 +120,49 @@ def compress(data, weights=None):
     output = tree.binary()
     for byte in data:
         output.append(codes[byte])
+
+    # Pad the front with 0's followed by 1 so we know where the real data
+    # starts
+    pad_bits = 8 - (len(output) % 8)
+    if pad_bits == 0:
+        pad_bits = 8
+
+    padding = bitstring.BitArray()
+    for i in range(pad_bits - 1):
+        padding.append("0b0")
+    padding.append("0b1")
+    output.prepend(padding)
+
     return output.tobytes()
 
 
 def decompress(data):
-    pass
+    stream = bitstring.BitStream(data)
+
+    # Read padding
+    while not stream.read("bool"):
+        pass
+
+    tree = Node.from_binary(stream)
+    out = b""
+    try:
+        while 1:
+            out += tree.read(stream)
+    except bitstring.ReadError:
+        pass
+
+    return out
 
 
 class TestHuffmanCoding(unittest.TestCase):
     _simple = b"122333"
     _simple_codes = {
         "1": "11",
-        "2": "01",
+        "2": "10",
         "3": "0"
     }
     _simple_tree = bitstring.Bits("0b00100110001100110010100110011")
-    _simple_compressed = bitstring.Bits("0x2633299ea0")
+    _simple_compressed = bitstring.Bits("0x498cca67d0")
 
     _lorem = (b"Lorem ipsum dolor sit amet, consectetur adipisicing "
         b"elit, sed do eiusmod tempor incididunt ut labore et dolore magna "
@@ -133,46 +173,46 @@ class TestHuffmanCoding(unittest.TestCase):
         b"cupidatat non proident, sunt in culpa qui officia deserunt "
         b"mollit anim id est laborum.")
     _lorem_codes = {
-        " ": "100",
-        ",": "0001001",
+        " ": "001",
+        ",": "1001000",
         ".": "111111",
-        "D": "101101001",
-        "E": "001101001",
-        "L": "11011111",
-        "U": "01011111",
-        "a": "1110",
-        "b": "0011111",
-        "c": "10010",
-        "d": "11000",
+        "D": "100101101",
+        "E": "100101100",
+        "L": "11111011",
+        "U": "11111010",
+        "a": "0111",
+        "b": "1111100",
+        "c": "01001",
+        "d": "00011",
         "e": "0000",
-        "f": "1011001",
-        "g": "0011001",
-        "h": "11101001",
-        "i": "011",
-        "l": "0111",
-        "m": "00010",
-        "n": "0101",
+        "f": "1001101",
+        "g": "1001100",
+        "h": "10010111",
+        "i": "110",
+        "l": "1110",
+        "m": "01000",
+        "n": "1010",
         "o": "0110",
-        "p": "01111",
-        "q": "111001",
-        "r": "1101",
-        "s": "01000",
-        "t": "1010",
-        "u": "0001",
-        "v": "0101001",
+        "p": "11110",
+        "q": "100111",
+        "r": "1011",
+        "s": "00010",
+        "t": "0101",
+        "u": "1000",
+        "v": "1001010",
         "x": "1001001"
     }
     _lorem_tree = bitstring.Bits("0x025c532ab62b85b2d25cadc2e2b359c5a144a2dd97"
         "8965d4586deba2c76d480b25cec, 0b101")
-    _lorem_compressed = bitstring.Bits("0x025c532ab62b85b2d25cadc2e2b359c5a144"
-        "a2dd978965d4586deba2c76d480b25cecbbeda028de8114c33b6c43a9c20a1324ca80"
-        "95050ecec37b439353301dd09880c4c34062813625009edb1ac9e1e056a0d47e3eda1"
-        "02a619db420b8caf4e77c8f7f17ea02b14ec4135628a415f084ce45a22b22b4710248"
-        "6c9d7536582efc29347e3edad115a1c1a9cef916f812607493084d86926540723d5fc"
-        "b48b44e1a08f4742619db6359a0fd0e905c06ba8d6296717d7504520eea0210124ddc"
-        "4530ceda100659132faa28bbf47f6bea1dfe1a64c81f403b10d6a34a5c12ea9217bc7"
-        "57545658fd67805a13102b51ac90bbfa722e359b2e4fa60101a2b504ceeea72b14788"
-        "08a8fc7db445f80")
+    _lorem_compressed = bitstring.Bits("0x0204b8a6556c570b65a4b95b85c566b38b42"
+        "8945bb2f12cba8b0dbd7458eda90164b9d97edac10778508236e6b22ca5d00b20a5a8"
+        "4095058b2e3dec2c9d530876590440323621a04861950479acea4e1e1c529853cff1a"
+        "c08291b7358143cca72fda787fcfd290ac82e328d59065056744833c611a612dc0c84"
+        "90b4e575cd463b9d0963cff1af08d61630a5fb4f1bc42490729642186c52d4209e1d7"
+        "f32d8c22f0a075c5811b7359d46c3d612e1430bca75194dd1e57503283b2901080a77"
+        "74208db9ac08419b1333a9a8ee73e7bceb17f996494879422c8b52964a5c12ea531ec"
+        "3757534d47d6d8614b208a294ea298ef399e3169b37273918082e294a1bbb297ac838"
+        "6404a79fe35c23f")
 
     def test_tree_from_data(self):
         tree = Node.from_data(self._simple)
@@ -186,12 +226,12 @@ class TestHuffmanCoding(unittest.TestCase):
         self.assertEqual(codes, self._lorem_codes)
 
     def test_tree_from_binary(self):
-        tree = Node.from_binary(self._simple_bits)
+        tree = Node.from_binary(self._simple_tree)
         codes = {symbol.decode("UTF-8"): code.unpack("bin")[0]
                  for symbol, code in tree.codes().items()}
         self.assertEqual(codes, self._simple_codes)
 
-        tree = Node.from_binary(self._lorem_bits)
+        tree = Node.from_binary(self._lorem_tree)
         codes = {symbol.decode("UTF-8"): code.unpack("bin")[0]
                  for symbol, code in tree.codes().items()}
         self.assertEqual(codes, self._lorem_codes)
@@ -202,6 +242,23 @@ class TestHuffmanCoding(unittest.TestCase):
 
         compressed = compress(self._lorem)
         self.assertEqual(bitstring.Bits(compressed), self._lorem_compressed)
+
+    def test_decompression(self):
+        data = decompress(self._simple_compressed)
+        self.assertEqual(data, self._simple)
+
+        data = decompress(self._lorem_compressed)
+        self.assertEqual(data, self._lorem)
+
+    def test_both(self):
+        compressed = compress(self._simple)
+        data = decompress(compressed)
+        self.assertEqual(data, self._simple)
+
+        compressed = compress(self._lorem)
+        data = decompress(compressed)
+        self.assertEqual(data, self._lorem)
+
 
 if __name__ == "__main__":
     unittest.main()

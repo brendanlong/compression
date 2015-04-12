@@ -77,12 +77,12 @@ def test_tree_from_data():
 
 def test_tree_from_binary():
     tree = huffman.Node.from_binary(simple_tree)
-    codes = {symbol.decode("UTF-8"): code.unpack("bin")[0]
+    codes = {chr(symbol): code.unpack("bin")[0]
              for symbol, code in tree.codes().items()}
     assert(codes == simple_codes)
 
     tree = huffman.Node.from_binary(lorem_tree)
-    codes = {symbol.decode("UTF-8"): code.unpack("bin")[0]
+    codes = {chr(symbol): code.unpack("bin")[0]
              for symbol, code in tree.codes().items()}
     assert(codes == lorem_codes)
 

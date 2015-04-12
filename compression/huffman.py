@@ -54,7 +54,7 @@ class Node(object):
     @staticmethod
     def _from_binary(stream, code):
         if stream.read("bool"):
-            symbol = stream.read("bytes:1")
+            symbol = stream.read("uint:8")
             return LeafNode(symbol, code=code)
         else:
             return Node(
@@ -147,11 +147,11 @@ def decompress(data):
         pass
 
     tree = Node.from_binary(stream)
-    out = b""
+    out = []
     try:
         while 1:
-            out += tree.read(stream)
+            out.append(tree.read(stream))
     except bitstring.ReadError:
         pass
 
-    return out
+    return bytes(out)

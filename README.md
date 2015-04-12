@@ -11,16 +11,16 @@ Programs:
 
 Python Packages:
 
-  * bitstrings
+  * bitstring
 
 ## Setup
 
-### Fedora 20
+### Fedora 21
 
     sudo yum install python3 python3-pip
-    pip-python3 install --user bitstring
+    pip3 install --user -r requirements.txt
 
 ### Ubuntu 14.04
 
     sudo apt-get install python3 python3-pip
-    pip3 install --user bitstring
+    pip3 install --user -r requirements.txt

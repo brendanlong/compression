@@ -1,5 +1,7 @@
 # Compression Examples
 
+[![Circle CI](https://circleci.com/gh/brendanlong/compression.svg?style=shield)](https://circleci.com/gh/brendanlong/compression)
+
 These are some Python modules I wrote to learn how various compression
 algorithms work.
 

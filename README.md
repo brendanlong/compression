@@ -12,6 +12,7 @@ Programs:
 Python Packages:
 
   * bitstring
+  * pytest
 
 ## Setup
 
